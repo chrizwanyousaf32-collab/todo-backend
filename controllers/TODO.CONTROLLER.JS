@@ -2,11 +2,9 @@ import Todo from "../models/todo.model.js";
 import mongoose from "mongoose";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 
-// =======================
 // CREATE TODO
-// =======================
 export const createTodo = asyncHandler(async (req, res) => {
-  const { title, description } = req.body;
+  const { title, description, dueDate } = req.body;
 
   if (!title || title.trim() === "") {
     return res.status(400).json({
@@ -15,25 +13,47 @@ export const createTodo = asyncHandler(async (req, res) => {
     });
   }
 
-  const todo = await Todo.create({ title, description });
+  if (dueDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  return res.status(201).json({
+    const selectedDate = new Date(dueDate);
+
+    if (selectedDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Past dates are not allowed",
+      });
+    }
+  }
+
+  const todo = await Todo.create({
+    title,
+    description,
+    dueDate,
+    user: req.user.id,
+  });
+
+  res.status(201).json({
     success: true,
     message: "Todo created successfully",
     data: todo,
   });
 });
 
-// =======================
 // GET ALL TODOS
-// =======================
 export const getTodos = asyncHandler(async (req, res) => {
   const { search, sort, page = 1, limit = 10 } = req.query;
 
-  let query = {};
+  let query = {
+    user: req.user.id,
+  };
 
   if (search) {
-    query.title = { $regex: search, $options: "i" };
+    query.title = {
+      $regex: search,
+      $options: "i",
+    };
   }
 
   const sortOption = {
@@ -49,9 +69,8 @@ export const getTodos = asyncHandler(async (req, res) => {
 
   const total = await Todo.countDocuments(query);
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
-    message: "Todos fetched successfully",
     total,
     page: Number(page),
     limit: Number(limit),
@@ -59,9 +78,7 @@ export const getTodos = asyncHandler(async (req, res) => {
   });
 });
 
-// =======================
 // GET TODO BY ID
-// =======================
 export const getTodoById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -72,7 +89,10 @@ export const getTodoById = asyncHandler(async (req, res) => {
     });
   }
 
-  const todo = await Todo.findById(id);
+  const todo = await Todo.findOne({
+    _id: id,
+    user: req.user.id,
+  });
 
   if (!todo) {
     return res.status(404).json({
@@ -81,18 +101,15 @@ export const getTodoById = asyncHandler(async (req, res) => {
     });
   }
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     data: todo,
   });
 });
 
-// =======================
 // UPDATE TODO
-// =======================
 export const updateTodo = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, description } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({
@@ -101,10 +118,16 @@ export const updateTodo = asyncHandler(async (req, res) => {
     });
   }
 
-  const todo = await Todo.findByIdAndUpdate(
-    id,
-    { title, description },
-    { new: true, runValidators: true }
+  const todo = await Todo.findOneAndUpdate(
+    {
+      _id: id,
+      user: req.user.id,
+    },
+    req.body,
+    {
+      new: true,
+      runValidators: true,
+    }
   );
 
   if (!todo) {
@@ -114,16 +137,14 @@ export const updateTodo = asyncHandler(async (req, res) => {
     });
   }
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     message: "Todo updated successfully",
     data: todo,
   });
 });
 
-// =======================
 // DELETE TODO
-// =======================
 export const deleteTodo = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -134,7 +155,10 @@ export const deleteTodo = asyncHandler(async (req, res) => {
     });
   }
 
-  const todo = await Todo.findByIdAndDelete(id);
+  const todo = await Todo.findOneAndDelete({
+    _id: id,
+    user: req.user.id,
+  });
 
   if (!todo) {
     return res.status(404).json({
@@ -143,15 +167,13 @@ export const deleteTodo = asyncHandler(async (req, res) => {
     });
   }
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     message: "Todo deleted successfully",
   });
 });
 
-// =======================
 // TOGGLE TODO
-// =======================
 export const toggleTodo = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -162,7 +184,10 @@ export const toggleTodo = asyncHandler(async (req, res) => {
     });
   }
 
-  const todo = await Todo.findById(id);
+  const todo = await Todo.findOne({
+    _id: id,
+    user: req.user.id,
+  });
 
   if (!todo) {
     return res.status(404).json({
@@ -172,9 +197,10 @@ export const toggleTodo = asyncHandler(async (req, res) => {
   }
 
   todo.isCompleted = !todo.isCompleted;
+
   await todo.save();
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     message: "Todo toggled successfully",
     data: todo,
