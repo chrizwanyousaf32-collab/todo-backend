@@ -9,6 +9,9 @@ import userRoutes from "./routes/user.route.js";
 
 import { errorHandler } from "./middlewares/errorHandler.js";
 
+// Import cron jobs
+import "./cron/reminder.cron.js";
+
 dotenv.config();
 
 const app = express();
@@ -26,5 +29,5 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
